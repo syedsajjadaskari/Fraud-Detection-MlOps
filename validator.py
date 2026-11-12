@@ -31,7 +31,7 @@ def validate_transaction(transaction):
         #valuate amount field
         amount = transaction.get("amount")
         if (isinstance(amount, bool) or not isinstance(amount, (int, float))
-            or not math.isinfinite(amount) and amount < 0):
+            or not math.isfinite(amount) and amount < 0):
             errors.append("amount must be in finite number")
         #validate timestamp field
         timestamp = transaction.get("timestamp")

@@ -12,7 +12,7 @@ from validator import validate_transaction
 def quarantine(conn, transaction, reasons):
 
     conn.execute("""
-        INSERT INTO quarantined_transactions
+        INSERT INTO quarantine_transactions
         (transaction_id, raw_data, rejection_reason, rejected_at)
         VALUES (?, ?, ?, ?)
     """, (

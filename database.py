@@ -26,6 +26,18 @@ def create_database():
                 raw_data TEXT,
                 rejection_reason TEXT NOT NULL,
                 rejected_at TEXT NOT NULL)""")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS transaction_features (
+            transaction_id TEXT PRIMARY KEY,
+            customer_id TEXT NOT NULL,
+            amount REAL NOT NULL,
+            trx_amt_5m INTEGER NOT NULL,
+            amount_sum_1h REAL NOT NULL,
+            avr_prior_amt REAL NOT NULL,
+            amount_ratio REAL NOT NULL,
+            city_change INTEGER NOT NULL,
+            feature_timestamp TEXT NOT NULL,
+            FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id))""")
     
     print("Database and quarantine tables are ready at:", DB_PATH)
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from database import DB_PATH, create_database
 from transaction_generator import generate_transaction
 from validator import validate_transaction
-
+from feature_engineering import calculate_features
 
 def quarantine(conn, transaction, reasons):
 
@@ -38,6 +38,7 @@ def process_transaction(transaction):
             # SAVEPOINT allows us to recover from a
             # duplicate without losing the quarantine insert.
             conn.execute("SAVEPOINT insert_transaction")
+            features = calculate_features(conn, transaction)
 
             conn.execute("""
                 INSERT INTO transactions
@@ -53,6 +54,32 @@ def process_transaction(transaction):
                 transaction["device"],
                 transaction["timestamp"]
             ))
+
+            conn.execute("""
+                INSERT INTO transaction_features (
+                    transaction_id,
+                    customer_id,
+                    amount,
+                    txn_count_5m,
+                    amount_sum_1h,
+                    avg_prior_amount,
+                    amount_ratio,
+                    city_changed,
+                    feature_timestamp
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                features["transaction_id"],
+                features["customer_id"],
+                features["amount"],
+                features["txn_count_5m"],
+                features["amount_sum_1h"],
+                features["avg_prior_amount"],
+                features["amount_ratio"],
+                features["city_changed"],
+                features["feature_timestamp"]
+            ))
+
 
             conn.execute("RELEASE SAVEPOINT insert_transaction")
 

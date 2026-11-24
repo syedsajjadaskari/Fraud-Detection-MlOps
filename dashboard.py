@@ -11,10 +11,8 @@ st.set_page_config(page_title="BankShield | Fraud Operations", page_icon="🏦",
 st.title("🏦 BankShield | Fraud Operations")
 st.caption("Synthetic transactions • Classroom fraud model • SQLite-backed monitoring")
 
-REQUIRED = {
-    "transactions", "quarantined_transactions",
-    "transaction_features", "fraud_predictions"
-}
+REQUIRED = {"transactions", "transaction_features", "fraud_predictions"}
+QUARANTINE_TABLE_NAMES = ("quarantined_transactions", "quarantine_transactions")
 
 
 def read_sql(query, params=()):
@@ -28,12 +26,19 @@ def check_tables():
         st.stop()
     names = set(read_sql("SELECT name FROM sqlite_master WHERE type='table'")["name"])
     missing = REQUIRED - names
+    quarantine_table = next(
+        (name for name in QUARANTINE_TABLE_NAMES if name in names),
+        None,
+    )
+    if quarantine_table is None:
+        missing.add("quarantined_transactions")
     if missing:
         st.error(f"Missing tables: {', '.join(sorted(missing))}. Complete Stages 3–5 and run database.py.")
         st.stop()
+    return quarantine_table
 
 
-check_tables()
+QUARANTINE_TABLE = check_tables()
 
 with st.sidebar:
     st.header("Dashboard controls")
@@ -49,10 +54,10 @@ with st.sidebar:
 
 @st.fragment(run_every="5s" if auto_refresh else None)
 def live_dashboard():
-    overview = read_sql("""
+    overview = read_sql(f"""
         SELECT
           (SELECT COUNT(*) FROM transactions) AS accepted,
-          (SELECT COUNT(*) FROM quarantined_transactions) AS rejected,
+          (SELECT COUNT(*) FROM {QUARANTINE_TABLE}) AS rejected,
           (SELECT COUNT(*) FROM fraud_predictions) AS scored,
           (SELECT COUNT(*) FROM fraud_predictions WHERE is_suspicious = 1) AS alerts,
           (SELECT MAX(timestamp) FROM transactions) AS latest_event
@@ -132,17 +137,17 @@ def live_dashboard():
         st.caption("An alert is a model-generated flag, not confirmed fraud.")
 
     with tab3:
-        reasons = read_sql("""
+        reasons = read_sql(f"""
             SELECT rejection_reason, COUNT(*) AS count
-            FROM quarantined_transactions
+            FROM {QUARANTINE_TABLE}
             GROUP BY rejection_reason ORDER BY count DESC
         """)
         if not reasons.empty:
             st.subheader("Quarantine reasons")
             st.bar_chart(reasons.set_index("rejection_reason"))
-        rejected_df = read_sql("""
+        rejected_df = read_sql(f"""
             SELECT transaction_id, rejection_reason, rejected_at
-            FROM quarantined_transactions ORDER BY id DESC LIMIT ?
+            FROM {QUARANTINE_TABLE} ORDER BY id DESC LIMIT ?
         """, (max_rows,))
         st.subheader("Latest rejected attempts")
         st.dataframe(rejected_df, hide_index=True, width="stretch")
